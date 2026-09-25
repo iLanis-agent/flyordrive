@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlyOrDrive - compare</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#101418; color:#e9eef2; min-height:100vh; }
+  .wrap { max-width:820px; margin:0 auto; padding:28px 20px 80px; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; }
+  header h1 { font-size:22px; } header h1 span { color:#7cc7ff; }
+  header a { color:#8798a5; text-decoration:none; font-size:14px; }
+  .card { background:#161d24; border:1px solid #27394a; border-radius:12px; padding:18px; margin-bottom:18px; }
+  label { font-size:12px; color:#8798a5; display:block; margin-bottom:4px; }
+  input { background:#101418; border:1px solid #314966; border-radius:8px; color:#e9eef2; padding:9px 10px; font-size:14px; width:100%; }
+  button { background:#7cc7ff; border:none; color:#0c1a26; font-weight:700; padding:11px 22px; border-radius:9px; font-size:14px; cursor:pointer; }
+  button:hover { filter:brightness(1.1); }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+  .row4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+  h3 { font-size:14px; color:#b8c8d4; margin-bottom:10px; }
+  .versus { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .opt { background:#101418; border:1px solid #27394a; border-radius:10px; padding:16px; }
+  .opt.win { border-color:#7cc7ff; }
+  .opt h4 { font-size:16px; margin-bottom:10px; }
+  .opt .cost { font-size:30px; font-weight:800; color:#fff; }
+  .opt .per { color:#8798a5; font-size:12px; margin-bottom:10px; }
+  .opt .row { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px solid #1b2530; color:#b8c8d4; }
+  .opt .row:last-child { border-bottom:none; }
+  .verdict { background:#13202c; border:1px solid #2a4a66; border-radius:10px; padding:14px 16px; margin-bottom:14px; font-size:15px; line-height:1.6; }
+  .verdict b { color:#7cc7ff; }
+  .err { color:#ff8a8a; font-size:13px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Fly<span>OrDrive</span></h1><a href="index.html">home</a></header>
+
+  <div class="card">
+    <div class="row4">
+      <div><label>One-way distance (km)</label><input id="dist" type="number" value="800"></div>
+      <div><label>Travelers</label><input id="pax" type="number" min="1" value="2"></div>
+      <div><label>Avg driving speed (km/h)</label><input id="speed" type="number" value="90"></div>
+      <div><label>Driving hours per day</label><input id="hrs" type="number" value="8"></div>
+    </div>
+    <h3>Drive</h3>
+    <div class="row4">
+      <div><label>Consumption (L/100km)</label><input id="l100" type="number" step="0.1" value="7"></div>
+      <div><label>Fuel price ($/L)</label><input id="fuel" type="number" step="0.01" value="1.60"></div>
+      <div><label>Hotel per night ($)</label><input id="hotel" type="number" value="100"></div>
+      <div></div>
+    </div>
+    <h3>Fly (per person + transfers)</h3>
+    <div class="row4">
+      <div><label>Ticket ($)</label><input id="ticket" type="number" value="120"></div>
+      <div><label>Bags/fees ($)</label><input id="bags" type="number" value="30"></div>
+      <div><label>Transfers total ($)</label><input id="transfers" type="number" value="40"></div>
+      <div><label>Airport time (h each way)</label><input id="airport" type="number" step="0.5" value="2"></div>
+    </div>
+    <div class="row4">
+      <div><label>Transfer time (h each way)</label><input id="thrs" type="number" step="0.25" value="0.5"></div>
+      <div></div><div></div>
+      <div><label>&nbsp;</label><button id="go" style="width:100%">Compare</button></div>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div id="out"></div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function usd(x){ return '$' + Math.round(x).toLocaleString('en-US'); }
+  function hrs(h){ const H = Math.floor(h), M = Math.round((h - H) * 60); return H + 'h ' + String(M).padStart(2,'0') + 'm'; }
+
+  function calc(){
+    let c;
+    try {
+      const opts = { distanceKm:$('dist').value, passengers:$('pax').value, avgSpeedKmh:$('speed').value,
+        driveHoursPerDay:$('hrs').value, l100:$('l100').value, fuelPrice:$('fuel').value, hotelPerNight:$('hotel').value,
+        ticketPrice:$('ticket').value, bagsFees:$('bags').value, transfersCost:$('transfers').value,
+        airportHours:$('airport').value, transferHours:$('thrs').value };
+      localStorage.setItem('flyordrive-settings', JSON.stringify(opts));
+      c = FlyDriveEngine.compare(opts);
+    } catch(e) {
+      $('out').innerHTML = '<div class="card err">' + esc(e.message) + '</div>';
+      return;
+    }
+    const cheapName = c.cheaper === 'drive' ? 'Driving' : 'Flying';
+    const fastName = c.faster === 'drive' ? 'driving' : 'flying';
+    let v = '<b>' + cheapName + ' is cheaper</b> by ' + usd(c.costDiff) + ' total; <b>' + fastName + ' is faster</b> by ' + hrs(c.timeDiffHours) + '.';
+    if (c.costPerHourSaved !== null) v += ' The faster option costs <b>' + usd(c.costPerHourSaved) + ' per hour saved</b>.';
+    else v += ' Same option wins both - easy call.';
+    v += ' Greener: <b>' + (c.greener === 'drive' ? 'drive' : 'fly') + '</b>.';
+    const opt = (name, p, win, extra) =>
+      '<div class="opt' + (win ? ' win' : '') + '"><h4>' + name + '</h4>'
+      + '<div class="cost">' + usd(p.costTotal) + '</div><div class="per">' + usd(p.costPerPerson) + ' per person</div>'
+      + '<div class="row"><span>Door-to-door time</span><span>' + hrs(p.hours) + '</span></div>'
+      + '<div class="row"><span>CO2 total</span><span>' + Math.round(p.co2Kg) + ' kg</span></div>'
+      + '<div class="row"><span>CO2 per person</span><span>' + Math.round(p.co2PerPerson) + ' kg</span></div>'
+      + extra + '</div>';
+    $('out').innerHTML = '<div class="verdict">' + v + '</div>'
+      + '<div class="versus">'
+      + opt('Drive', c.drive, c.cheaper === 'drive', '<div class="row"><span>Road days / hotel nights</span><span>' + c.drive.days + ' / ' + c.drive.nights + '</span></div><div class="row"><span>Fuel</span><span>' + Math.round(c.drive.fuelLiters) + ' L</span></div>')
+      + opt('Fly', c.fly, c.cheaper === 'fly', '<div class="row"><span>Time in the air</span><span>' + hrs(c.fly.flightHours) + '</span></div>')
+      + '</div>';
+  }
+
+  try {
+    const st = JSON.parse(localStorage.getItem('flyordrive-settings') || 'null');
+    if (st) {
+      $('dist').value = st.distanceKm; $('pax').value = st.passengers; $('speed').value = st.avgSpeedKmh; $('hrs').value = st.driveHoursPerDay;
+      $('l100').value = st.l100; $('fuel').value = st.fuelPrice; $('hotel').value = st.hotelPerNight;
+      $('ticket').value = st.ticketPrice; $('bags').value = st.bagsFees; $('transfers').value = st.transfersCost;
+      $('airport').value = st.airportHours; $('thrs').value = st.transferHours;
+    }
+  } catch(e) {}
+  $('go').onclick = calc;
+  calc();
+})();
+</script>
+</body>
+</html>
